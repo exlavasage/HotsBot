@@ -65,7 +65,7 @@ def handle_message(msg):
     response = ''    
     if query['command'] == 'free':        
         r = requests.get('http://heroesofthestorm.gamepedia.com/Free_rotation')        
-        soup = BeautifulSoup(r.content, html5lib)
+        soup = BeautifulSoup(r.content)
         results = []        
         for child in soup.select('div.link'):            
             results.append(child.contents[0]['title'])
@@ -81,7 +81,7 @@ def handle_message(msg):
         soup = BeautifulSoup(r.content)
         url = soup.select('ul[class=news-list]')[1].select('a[href*=weekly-sale]')[0]['href']        
         r = requests.get('http://us.battle.net/'+url)
-        soup = BeautifulSoup(r.content, 'html5lib')        
+        soup = BeautifulSoup(r.content)        
         
         response = ''
         for child in soup.select('p[style^=margin:0]'):
@@ -90,7 +90,7 @@ def handle_message(msg):
             response = response + u'\n'
     elif query['command'] == 'random':
         r = requests.get('http://heroesofthestorm.gamepedia.com/Hero')        
-        soup = BeautifulSoup(r.content, "html5lib")
+        soup = BeautifulSoup(r.content)
         results = []
         for child in soup.select('span[id$='+query['args'].capitalize()+'_heroes]'):            
             child = child.parent.next_sibling.next_sibling.next_sibling.next_sibling.next_sibling.next_sibling
