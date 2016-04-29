@@ -1,5 +1,8 @@
 import telepot
 from telepot.namedtuple import InlineQueryResultArticle
+import subprocess
+import sys
+import os
 import time
 import re
 import requests
@@ -10,6 +13,8 @@ from ConfigParser import RawConfigParser
 
 queryResponse = 0
 maxMessageSize = 4096
+ownerId = 0
+to_exit = False
 
 def parse_query(query):
     m = re.match('^/?(?P<command>[^@ ]*)(@teakhotsbot)? ?(?P<args>.*)$', query)
@@ -30,20 +35,8 @@ def handle_table(table):
         results.append(rr)
     return results
 
-def clean_results(res):    
-    new_res = []
-    last_match = False
-    r = re.compile('^(\s)*$')
-    for part in res:
-        if type(part) == list:
-            new_res.append(part)
-        else:
-            m = r.match(part)                
-            if not(m != None and last_match == True):
-                part = r.sub('\n\n', part)
-                new_res.append(part)                    
-            last_match = m != None
-    return new_res
+def is_end(tag):
+    return 'p' in tag and len(tag.contents) == 1 and 'img' in tag.contents[0]
 
 def handle_message(msg):    
     flavor = telepot.flavor(msg)
@@ -62,8 +55,17 @@ def handle_message(msg):
     if len(query) == 0:
         return
 
-    response = ''    
-    if query['command'] == 'free':        
+    response = ''
+    global ownerId
+    if query['command'] == 'redeploy' and int(chat_id) == int(ownerId):
+        subprocess(['git', 'pull'])
+        subprocess.Popen(['C:\Python27\Python.exe', os.getcwd()+'\HotsBot.py', 'redeploy'])
+        response = 'Redeploying: '
+        bot.sendMessage(chat_id, response)
+        global to_exit
+        to_exit = True
+        return
+    elif query['command'] == 'free':        
         r = requests.get('http://heroesofthestorm.gamepedia.com/Free_rotation')        
         soup = BeautifulSoup(r.content)
         results = []        
@@ -107,19 +109,24 @@ def handle_message(msg):
         url = soup.select('ul[class=news-list]')[1].find_next('a', text=re.compile('Notes'))['href']
         url = 'http://us.battle.net' + url
         r = requests.get(url)    
-        soup = BeautifulSoup(UnicodeDammit(r.content, is_html=True).unicode_markup, 'html5lib')
+        soup = BeautifulSoup(UnicodeDammit(r.content, is_html=True).unicode_markup, 'html5lib')        
         
         results = []
-        if len(query['args']) > 0:                        
+        if len(query['args']) > 0:
             catagory = soup.find(['h3','h4'], text=query['args'].title())
-            end = catagory.find_next('a', text=re.compile('Return'))
-            if end:
-                end = end.parent.parent            
-            hard_end = catagory.find_next('style')
+            if not catagory:
+                catagory = soup.find('a', attrs={'name':query['args'].title().replace(' ', '_')}).parent
+            end = catagory.find_next(['h3', 'h4'])
+            print catagory.find_next('img[alt*=InvisibleDividerLine]')
+            hard_end = catagory.find_next('div', 'blockquote')            
+
             results = []
+            pop = False
             for child in catagory.find_next_siblings():
-                if child == end or child == hard_end:
-                    break                
+                if child == end:                    
+                    break
+                if child == hard_end:
+                    break
 
                 if child.name == 'table':
                     results.append(handle_table(child))            
@@ -127,7 +134,10 @@ def handle_message(msg):
                     for part in child.strings:                    
                         results.append(part)        
 
-            results = clean_results(results)
+            while type(results[-1]) != list and results[-1].isspace():
+                results.pop()
+            if type(results[-1]) != list and 'Return' in results[-1]:     
+                results.pop()
                             
             response = query['args'].title()+'\n'
             for result in results:
@@ -141,14 +151,13 @@ def handle_message(msg):
                     response = response + result                    
         else:
             response = 'Patch Notes:\n'
-            if soup.find_next('ul[class=toc-list]') :
-                for child in soup.find_next('ul[class=toc-list]').select('li'):
+            if soup.find('ul[class=toc-list]') :
+                for child in soup.find('ul[class=toc-list]').select('li'):                    
                     response = response + '['+child.getText()+']('+url+child.select('a[href]')[0]['href']+')\n'
             else:                
                 print len(soup.find('article').find_all('h3'))
                 for child in soup.find('article').find_all('h3'):
-                    response = response + '['+child.getText()+']('+url+'#'+child.getText()+')\n'
-                print response
+                    response = response + '['+child.getText()+']('+url+'#'+child.getText()+')\n'                
             response = response + 'Use /patch [Section] for more information'    
     if len(response) == 0:
         return    
@@ -177,13 +186,17 @@ def handle_message(msg):
 parser = RawConfigParser()
 parser.read('hots.cfg')
 api_key = parser.get('config', 'api_key')
+ownerId = parser.get('config', 'owner_id')
 
 bot = telepot.Bot(api_key)
 bot.getMe()
 
+if len(sys.argv) > 1 and 'redeploy' in sys.argv[1]:
+    time.sleep(10)
+    bot.sendMessage(ownerId, 'Restarted: ')
 print 'Hello'
 bot.notifyOnMessage(handle_message)
 
-while 1:
-    time.sleep(10)
+while not to_exit:
+    time.sleep(1)
 print 'Goodbye'
