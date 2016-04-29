@@ -58,14 +58,14 @@ def handle_message(msg):
     response = ''
     global ownerId
     if query['command'] == 'redeploy' and int(chat_id) == int(ownerId):
-        subprocess(['git', 'pull'])
-        subprocess.Popen(['C:\Python27\Python.exe', os.getcwd()+'\HotsBot.py', 'redeploy'])
+        #subprocess.call(['git', 'pull'])
+        subprocess.Popen('cd '+os.getcwd()+' & git pull & C:\Python27\Python.exe HotsBot.py redeploy', shell=True)
         response = 'Redeploying: '
         bot.sendMessage(chat_id, response)
         global to_exit
         to_exit = True
         return
-    elif query['command'] == 'free':        
+    if query['command'] == 'free':        
         r = requests.get('http://heroesofthestorm.gamepedia.com/Free_rotation')        
         soup = BeautifulSoup(r.content)
         results = []        
@@ -199,4 +199,5 @@ bot.notifyOnMessage(handle_message)
 
 while not to_exit:
     time.sleep(1)
+time.sleep(1)
 print 'Goodbye'
