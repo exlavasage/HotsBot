@@ -51,21 +51,21 @@ def handle_message(msg):
         query_id, from_id, query_string = telepot.glance(msg, flavor='inline_query')
         query = query_string.lower()
 
-    query = parse_query(query)    
+    query = parse_query(query)
+    print query
     if len(query) == 0:
         return
 
     response = ''
     global ownerId
-    if query['command'] == 'redeploy' and int(chat_id) == int(ownerId):
-        #subprocess.call(['git', 'pull'])
+    if query['command'] == 'redeploy' and int(chat_id) == int(ownerId):        
         subprocess.Popen('cd '+os.getcwd()+' & git pull & C:\Python27\Python.exe HotsBot.py redeploy', shell=True)
         response = 'Redeploying: '
         bot.sendMessage(chat_id, response)
         global to_exit
         to_exit = True
         return
-    if query['command'] == 'free':        
+    elif query['command'] == 'free':        
         r = requests.get('http://heroesofthestorm.gamepedia.com/Free_rotation')        
         soup = BeautifulSoup(r.content)
         results = []        
@@ -79,17 +79,17 @@ def handle_message(msg):
             else:
                 response = response + results[i]        
     elif query['command'] == 'sale':
-        r = requests.get('http://us.battle.net/heroes/en/blog/')
-        soup = BeautifulSoup(r.content)
+        r = requests.get('http://us.battle.net/heroes/en/blog/')        
+        soup = BeautifulSoup(r.content, 'html5lib')
         url = soup.select('ul[class=news-list]')[1].select('a[href*=weekly-sale]')[0]['href']        
-        r = requests.get('http://us.battle.net/'+url)
-        soup = BeautifulSoup(r.content)        
+        r = requests.get('http://us.battle.net/'+url)        
+        soup = BeautifulSoup(UnicodeDammit(r.content, is_html=True).unicode_markup, 'html5lib') 
         
-        response = ''
-        for child in soup.select('p[style^=margin:0]'):
-            for part in child.stripped_strings:
-                response = response + part
-            response = response + u'\n'
+        week = soup.select('p[style^=text-align]')[0].getText()
+        response = week + '\n'
+        table = handle_table(soup.select('table[class=schedule_table]')[0])[1:];        
+        for part in table:
+            response = response + part[0] + ':\t' + part[1] + '\n'                
     elif query['command'] == 'random':
         r = requests.get('http://heroesofthestorm.gamepedia.com/Hero')        
         soup = BeautifulSoup(r.content)
